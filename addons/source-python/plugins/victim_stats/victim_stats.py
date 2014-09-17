@@ -1,152 +1,54 @@
 # ../victim_stats/victim_stats.py
 
+"""Stores victim stat information and displays it on player death."""
+
 # =============================================================================
 # >> IMPORTS
 # =============================================================================
 # Source.Python Imports
-#   Config
-from config.manager import ConfigManager
-#   Settings
-from settings.player import PlayerSettings
-#   Translations
-from translations.strings import LangStrings
+#   Events
+from events import Event
+#   Filters
+from filters.players import PlayerIter
+#   Players
+from players.helpers import index_from_playerinfo
+from players.helpers import playerinfo_from_userid
 
 # Script Imports
-from victim_stats.info import info
+from victim_stats.players import PlayerStats
+from victim_stats.players import player_dictionary
 
 
 # =============================================================================
-# >> PUBLIC VARIABLE
+# >> GAME EVENTS
 # =============================================================================
-# Make sure the variable is set to the proper version
-info.convar.set_string(info.version)
-
-# Make the variable public
-info.convar.make_public()
-
-
-# =============================================================================
-# >> GLOBAL VARIABLES
-# =============================================================================
-# Get the translations
-victim_stats_strings = LangStrings('victim_stats')
-
-
-class _VictimStats(dict):
-    def __missing__(self, userid):
-        value = self[userid] = _PlayerStats(userid)
-        return value
-
-    def __delitem__(self, userid):
-        if userid in self:
-            super(_VictimStats, self).__delitem__(userid)
-
-VictimStats = _VictimStats()
-
-
-class _PlayerStats(PlayerEntity):
-    def __new__(cls, userid):
-        self = super(_PlayerStats, cls).__new__(cls, index_from_userid(userid))
-        return self
-
-    def __init__(self, userid):
-        self.taken = _DamageDictionary()
-        self.given = _DamageDictionary()
-        self.kills = _KillsDictionary()
-
-    def send_stats(
-            self, killtype=None, attackername=None,
-            headshot=None, weapon=None, distance=None, health=None):
-
-        if self.is_fake_client():
-            return
-
-        setting = VictimStats.location.get_setting(self.index)
-        if not setting in range(1, 6):
-            return
-        if setting in (1, 2):
-            self._sent_chat_stats(
-                killtype, attackername, headshot,
-                weapon, distance, health, setting == 1)
-
-        elif setting in (3, 4):
-            self._send_gui_stats(
-                killtype, attackername, headshot,
-                weapon, distance, health, setting == 3)
-        elif setting == 5:
-            self._send_gui_menu(
-                killtype, attackername, headshot,
-                weapon, distance, health)
-
-    def _send_chat_stats(
-            killtype, attackername. headshot,
-            weapon, distance, health, use_hitgroups):
-
-        pass
-
-    def _send_gui_stats(
-            killtype, attackername. headshot,
-            weapon, distance, health, use_hitgroups):
-
-        pass
-
-    def _send_gui_menu(
-            killtype, attackername. headshot,
-            weapon, distance, health):
-
-        pass
-
-
-class _Damage(object):
-    def __init__(self):
-        self.hits = 0
-        self.damage = 0
-        self.hitgroups = _HitGroups()
-
-
-class _Kills(object):
-    def __init__(self):
-        self.kills = 0
-        self.weapon = None
-        self.headshot = False
-        self.distance = None
-
-
-class _StatsDictionary(dict):
-    def __missing__(self, username):
-        value = self[username] = self.instance()
-        return value
-
-class _DamageDictionary(_StatsDictionary):
-    instance = _Damage
-
-
-class _KillsDictionary(dict):
-    instance = _Kills
-
-
-class _HitGroups(dict):
-    def __missing__(self, hitgroup):
-        value = self[hitgroup] = 0
-        return value
-
-
 @Event
 def player_hurt(game_event):
+    """Add the stats for the given attack."""
+    # Get the attacker
     attacker = _get_valid_attacker(game_event)
-    if not isinstance(attacker, _PlayerStats):
+
+    # Should the victim stats be collected?
+    if not isinstance(attacker, PlayerStats):
         return
-    victim = VictimStats[game_event.get_int('userid')]
+
+    # Get the victim
+    victim = player_dictionary[game_event.get_int('userid')]
+
+    # Get the damage
     damage = game_event.get_int('dmg_health')
+
+    # Get the hitgroup that was hit
     hitgroup = game_event.get_int('hitgroup')
-    if victim.name in attacker.kills:
-        given = attacker.kills[victim.name]
-    else:
-        given = attacker.given[victim.name]
-    taken = victim.taken[attacker.name]
+
+    # Add the damage stats to the attacker's dictionary for the victim
+    given = attacker.given[victim.name]
     given.damage += damage
     given.hits += 1
     given.hitgroups[hitgroup] += 1
+
+    # Add the damage stats to the victim's dictionary for the attacker
+    taken = victim.taken[attacker.name]
     taken.damage += damage
     taken.hits += 1
     taken.hitgroups[hitgroup] += 1
@@ -154,44 +56,82 @@ def player_hurt(game_event):
 
 @Event
 def player_death(game_event):
+    """Send victim their stats and add the victim to the attacker's kills."""
+    # Get the attacker
     attacker = _get_valid_attacker(game_event)
-    victim = VictimStats[game_event.get_int('userid')]
-    if isinstance(attacker, _PlayerStats):
 
+    # Get the victim
+    victim = player_dictionary[game_event.get_int('userid')]
+
+    # Was this a good kill (non-team/non-suicide)?
+    if isinstance(attacker, PlayerStats):
+
+        # Get whether this kill was a headshot
         headshot = game_event.get_bool('headshot')
-        weapon = game_event.get_string('weapon')
-        distance = attacker.m_vecOrigin.get_distance(victim.m_vecOrigin)
 
-        kills = attacker.kills[victim.name]
-        kills.kills += 1
+        # Get the killing weapon
+        weapon = game_event.get_string('weapon')
+
+        # Get the distance from the attacker to the victim
+        distance = attacker.get_key_value_vector(
+            'origin').get_distance(victim.get_key_value_vector('origin'))
+
+        # Add the kill stats to the attacker's dictionary for the victim
+        kills = attacker.killed[victim.name]
+        kills.killed += 1
         kills.headshot = headshot
         kills.weapon = weapon
         kills.distance = distance
 
+        # Send the victim their victim stats
         victim.send_stats(
-            'Killer', attacker.name, headshot, weapon,
-            distance, game_event.get_int('health'))
+            'Killer Alive' if attacker.health > 0 else 'Killer Dead',
+            attacker.name, headshot, weapon, distance, attacker.health)
 
-        return
+    # Was this a suicide?
+    elif attacker is None:
 
-    if attacker is None:
-
+        # Send the victim their victim stats with suicide message
         victim.send_stats('Suicide')
 
+    # Was this a team-kill?
     else:
 
-        victim.send_stats('Team-Killed')
+        # Send the victim their victim stats with team-kill message
+        victim.send_stats('Team-Killed', attacker.name)
+
+
+@Event
+def player_spawn(game_event):
+    """Remove the player's stats when they spawn."""
+    del player_dictionary[game_event.get_int('userid')]
+
+
+@Event
+def round_start(game_event):
+    """Clear the player dictionary."""
+    player_dictionary.clear()
 
 
 @Event
 def round_end(game_event):
-    for userid in PlayerIter('alive', return_types='userid'):
-        VictimStats[userid].send_stats()
+    """Send stats to players who survived the round."""
+    # Is the game commencing?
+    if game_event.get_int('reason') == 15:
+        return
+
+    # Loop through all living players
+    for userid in PlayerIter('alive', 'bot', 'userid'):
+
+        # Send the player their stats
+        player_dictionary[userid].send_stats()
 
 
+# =============================================================================
+# >> HELPER FUNCTIONS
+# =============================================================================
 def _get_valid_attacker(game_event):
-    '''Returns the attacker's userid if not a self or team inflicted event'''
-
+    """Return the attacker's userid if not a self or team inflicted event."""
     # Get the attacker's userid
     attacker = game_event.get_int('attacker')
 
@@ -217,4 +157,4 @@ def _get_valid_attacker(game_event):
         return index_from_playerinfo(aplayer)
 
     # If all checks pass, count the attack/kill
-    return VictimStats[attacker]
+    return player_dictionary[attacker]
