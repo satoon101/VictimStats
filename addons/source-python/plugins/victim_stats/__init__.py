@@ -5,16 +5,13 @@
 # =============================================================================
 # >> IMPORTS
 # =============================================================================
-# Source.Python Imports
-#   Core
+# Source.Python
 from core import SOURCE_ENGINE
-#   Paths
 from paths import TRANSLATION_PATH
-#   Translations
 from translations.strings import LangStrings
 
-# Script Imports
-from victim_stats.info import info
+# Plugin
+from .info import info
 
 
 # =============================================================================
@@ -22,20 +19,29 @@ from victim_stats.info import info
 # =============================================================================
 # Verify that the engine is supported
 if not TRANSLATION_PATH.joinpath(
-        info.basename, '{0}.ini'.format(SOURCE_ENGINE)).isfile():
+    info.name,
+    '{engine}.ini'.format(engine=SOURCE_ENGINE)
+).isfile():
     raise NotImplementedError(
-        'Engine "{0}" not supported'.format(SOURCE_ENGINE))
+        'Engine "{engine}" not supported'.format(engine=SOURCE_ENGINE)
+    )
 
 
 # =============================================================================
 # >> GLOBAL VARIABLES
 # =============================================================================
 # Get the translations
-victim_stats_strings = LangStrings('{0}/strings'.format(info.basename))
+victim_stats_strings = LangStrings('{name}/strings'.format(name=info.name))
 
 # Merge in the engine specific translations
 victim_stats_strings.update(
-    LangStrings('{0}/{1}'.format(info.basename, SOURCE_ENGINE)))
+    LangStrings(
+        '{name}/{engine}'.format(
+            name=info.name,
+            engine=SOURCE_ENGINE,
+        )
+    )
+)
 
 # Get the hitgroup translations
-hitgroup_strings = LangStrings('{0}/hitgroups'.format(info.basename))
+hitgroup_strings = LangStrings('{name}/hitgroups'.format(name=info.name))

@@ -5,24 +5,28 @@
 # =============================================================================
 # >> IMPORTS
 # =============================================================================
-# Source.Python Imports
-#   Colors
+# Source.Python
 import colors
-#   Config
 from config.manager import ConfigManager
-#   Core
 from core import SOURCE_ENGINE
 
-# Script Imports
-from victim_stats import victim_stats_strings
-from victim_stats.info import info
+# Plugin
+from . import victim_stats_strings
+from .info import info
 
 
 # =============================================================================
 # >> GLOBAL VARIABLES
 # =============================================================================
 # Get all available options
-type_options = sorted(item for item in victim_stats_strings if item.isdigit())
+display_type_options = sorted(
+    item for item in victim_stats_strings
+    if item.startswith('default_display_type:')
+)
+distance_type_options = sorted(
+    item for item in victim_stats_strings
+    if item.startswith('default_distance_type:')
+)
 
 
 # =============================================================================
@@ -35,19 +39,39 @@ killed_color = None
 killer_color = None
 
 # Create the victim_stats.cfg file and execute it upon __exit__
-with ConfigManager(info.basename) as config:
+with ConfigManager(filepath=info.name, cvar_prefix='vs') as config:
 
-    # Create the default stats type convar
-    default_type = config.cvar(
-        'vs_default_type', '1', 0,
-        victim_stats_strings['Default Type'])
+    # Create the default display type convar
+    display_type = config.cvar(
+        name='default_display_type',
+        default=1,
+        description=victim_stats_strings['default_display_type'],
+    )
 
-    # Loop through all options
-    for _item in type_options:
+    # Add all options for the default display type
+    for _item in display_type_options:
+        display_type.Options.append(
+            '{value} - {text}'.format(
+                value=_item,
+                text=victim_stats_strings[_item].get_string()
+            )
+        )
 
-        # Add the option to the cfg
-        default_type.Options.append('{0} - {1}'.format(
-            _item, victim_stats_strings[_item].get_string()))
+    # Create the default distance type convar
+    distance_type = config.cvar(
+        name='default_distance_type',
+        default=2,
+        description=victim_stats_strings['default_distance_type']
+    )
+
+    # Add all options for the default display type
+    for _item in distance_type_options:
+        distance_type.Options.append(
+            '{value} - {text}'.format(
+                value=_item,
+                text=victim_stats_strings[_item].get_string()
+            )
+        )
 
     if SOURCE_ENGINE == 'orangebox':
 
@@ -59,17 +83,25 @@ with ConfigManager(info.basename) as config:
             config.text(line)
 
         attacker_color = config.cvar(
-            'vs_attacker_color', '255,0,0', 0,
-            victim_stats_strings['Attacker Color'])
+            name='attacker_color',
+            default='255,0,0',
+            description=victim_stats_strings['Attacker Color'],
+        )
 
         wounded_color = config.cvar(
-            'vs_wounded_color', '255,0,0', 0,
-            victim_stats_strings['Wounded Color'])
+            name='wounded_color',
+            default='255,0,0',
+            description=victim_stats_strings['Wounded Color'],
+        )
 
         killed_color = config.cvar(
-            'vs_killed_color', '255,0,0', 0,
-            victim_stats_strings['Killed Color'])
+            name='killed_color',
+            default='255,0,0',
+            description=victim_stats_strings['Killed Color'],
+        )
 
         killer_color = config.cvar(
-            'vs_killer_color', '255,0,0', 0,
-            victim_stats_strings['Killer Color'])
+            name='killer_color',
+            default='255,0,0',
+            description=victim_stats_strings['Killer Color'],
+        )
