@@ -56,7 +56,6 @@ kill_stats = partial(
 # >> CLASSES
 # =============================================================================
 class _PlayerDictionary(dict):
-
     """Stores players with their victim stats information."""
 
     def __init__(self):
@@ -106,7 +105,6 @@ player_dictionary = _PlayerDictionary()
 
 
 class PlayerStats(Player):
-
     """Store victim stats information and display it when the player dies."""
 
     def __init__(self, index):

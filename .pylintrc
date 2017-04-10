@@ -8,9 +8,15 @@ ignore=
 # For a list of error codes, see:
 #   http://pylint-messages.wikidot.com/all-codes
 disable=
+    bad-continuation,
+    import-error,
+    no-name-in-module,
 
 
 [BASIC]
+# List of bad builtin function names
+bad-functions=eval,exec,__import__
+
 # Module name regex
 module-rgx=[a-z_][a-z0-9_]{2,30}$
 
@@ -45,6 +51,11 @@ inlinevar-rgx=[A-Za-z_][A-Za-z0-9_]*$
 good-names=
 
 
+[DESIGN]
+# The maximum number of arguments allowed
+max-args=9
+
+
 [REPORTS]
 # The message output template
 msg-template={msg_id}:{line:3d},{column:2d}: {msg} ({symbol})
@@ -54,3 +65,7 @@ msg-template={msg_id}:{line:3d},{column:2d}: {msg} ({symbol})
 ignore-imports=yes
 ignore-comments=yes
 ignore-docstrings=yes
+
+
+[VARIABLES]
+dummy-variables-rgx=game_event
