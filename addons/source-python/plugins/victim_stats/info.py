@@ -12,4 +12,4 @@ from plugins.manager import plugin_manager
 # =============================================================================
 # >> PLUGIN INFO
 # =============================================================================
-info = plugin_manager.get_plugin_info(__name__.split('.', 1)[0])
+info = plugin_manager.get_plugin_info(__name__)
