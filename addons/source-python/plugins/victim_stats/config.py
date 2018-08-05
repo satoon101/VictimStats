@@ -6,13 +6,22 @@
 # >> IMPORTS
 # =============================================================================
 # Source.Python
-import colors
 from config.manager import ConfigManager
-from core import SOURCE_ENGINE
 
 # Plugin
-from . import victim_stats_strings
 from .info import info
+from .strings import CONFIG_STRINGS
+
+
+# =============================================================================
+# >> ALL DECLARATION
+# =============================================================================
+__all__ = (
+    'display_type',
+    'display_type_options',
+    'distance_type',
+    'distance_type_options',
+)
 
 
 # =============================================================================
@@ -20,11 +29,11 @@ from .info import info
 # =============================================================================
 # Get all available options
 display_type_options = sorted(
-    item for item in victim_stats_strings
+    item for item in CONFIG_STRINGS
     if item.startswith('default_display_type:')
 )
 distance_type_options = sorted(
-    item for item in victim_stats_strings
+    item for item in CONFIG_STRINGS
     if item.startswith('default_distance_type:')
 )
 
@@ -32,12 +41,6 @@ distance_type_options = sorted(
 # =============================================================================
 # >> CONFIGURATION
 # =============================================================================
-# Set the base color variables
-attacker_color = None
-wounded_color = None
-killed_color = None
-killer_color = None
-
 # Create the victim_stats.cfg file and execute it upon __exit__
 with ConfigManager(filepath=info.name, cvar_prefix='vs') as config:
 
@@ -45,7 +48,7 @@ with ConfigManager(filepath=info.name, cvar_prefix='vs') as config:
     display_type = config.cvar(
         name='default_display_type',
         default=1,
-        description=victim_stats_strings['default_display_type'],
+        description=CONFIG_STRINGS['default_display_type'],
     )
 
     # Add all options for the default display type
@@ -53,7 +56,7 @@ with ConfigManager(filepath=info.name, cvar_prefix='vs') as config:
         display_type.Options.append(
             '{value} - {text}'.format(
                 value=_item,
-                text=victim_stats_strings[_item].get_string()
+                text=CONFIG_STRINGS[_item].get_string()
             )
         )
 
@@ -61,7 +64,7 @@ with ConfigManager(filepath=info.name, cvar_prefix='vs') as config:
     distance_type = config.cvar(
         name='default_distance_type',
         default=2,
-        description=victim_stats_strings['default_distance_type']
+        description=CONFIG_STRINGS['default_distance_type']
     )
 
     # Add all options for the default display type
@@ -69,39 +72,6 @@ with ConfigManager(filepath=info.name, cvar_prefix='vs') as config:
         distance_type.Options.append(
             '{value} - {text}'.format(
                 value=_item,
-                text=victim_stats_strings[_item].get_string()
+                text=CONFIG_STRINGS[_item].get_string()
             )
-        )
-
-    if SOURCE_ENGINE == 'orangebox':
-
-        config.section('Chat Color Options')
-        config.text('')
-        _color_options = victim_stats_strings['Options']
-        _color_options.tokens = {'colors': '\n\t'.join(list(colors.__all__))}
-        for line in _color_options.get_string().splitlines():
-            config.text(line)
-
-        attacker_color = config.cvar(
-            name='attacker_color',
-            default='255,0,0',
-            description=victim_stats_strings['Attacker Color'],
-        )
-
-        wounded_color = config.cvar(
-            name='wounded_color',
-            default='255,0,0',
-            description=victim_stats_strings['Wounded Color'],
-        )
-
-        killed_color = config.cvar(
-            name='killed_color',
-            default='255,0,0',
-            description=victim_stats_strings['Killed Color'],
-        )
-
-        killer_color = config.cvar(
-            name='killer_color',
-            default='255,0,0',
-            description=victim_stats_strings['Killer Color'],
         )
