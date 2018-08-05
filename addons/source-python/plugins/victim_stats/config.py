@@ -42,7 +42,7 @@ distance_type_options = sorted(
 # >> CONFIGURATION
 # =============================================================================
 # Create the victim_stats.cfg file and execute it upon __exit__
-with ConfigManager(filepath=info.name, cvar_prefix='vs') as config:
+with ConfigManager(filepath=info.name, cvar_prefix='vs_') as config:
 
     # Create the default display type convar
     display_type = config.cvar(
