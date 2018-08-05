@@ -159,41 +159,58 @@ class PlayerStats(Player):
         """Return a string for the given group's hitgroups."""
         hitgroups = list()
         for hitgroup, value in group.hitgroups.items():
-            hitgroups.append(
-                '{name}: {value}'.format(
-                    name=TRANSLATION_STRINGS[f'Hitgroup:{hitgroup}'].get_string(self.language),
-                    value=value,
-                )
+            name = TRANSLATION_STRINGS[f'Hitgroup:{hitgroup}'].get_string(
+                language=self.language,
             )
+            hitgroups.append(f'{name}: {value}')
         return ' - ' + '; '.join(hitgroups)
 
-    def get_weapon_info(self, string_name, kill_info, distance_setting, for_menu=False):
-        """"""
+    def get_weapon_info(
+        self, string_name, kill_info, distance_setting, for_menu
+    ):
+        """Return the translation for weapon info and headshot."""
         if string_name not in ('Killed', 'Killer'):
             return '', ''
 
         if kill_info is None:
             return '', ''
 
-        return TRANSLATION_STRINGS['Base:Weapon'].get_string(
+        message = TRANSLATION_STRINGS['Base:Weapon'].get_string(
             language=self.language,
             weapon_color='' if for_menu else '\x05',
             weapon=kill_info.weapon,
             at_color='' if for_menu else '\x01',
             distance_color='' if for_menu else '\x04',
-            distance=self.get_distance_display(kill_info.distance, distance_setting),
-        ), TRANSLATION_STRINGS['Headshot'] if kill_info.headshot and not for_menu else ''
+            distance=self.get_distance_display(
+                distance=kill_info.distance,
+                setting=distance_setting,
+            ),
+        )
+        headshot = ''
+        if kill_info.headshot and not for_menu:
+            headshot = TRANSLATION_STRINGS['Headshot']
+        return message, headshot
 
-    def iter_messages(self, string_name, group, use_hitgroups, distance_setting, color=None):
-        """"""
+    def iter_messages(
+        self, string_name, group, use_hitgroups, distance_setting, color=None
+    ):
+        """Yield each message to be sent for the given group."""
         for_menu = color is None
         for username, values in group.items():
             hitgroups = self.get_hitgroups(values) if use_hitgroups else ''
-            weapon_info, headshot = self.get_weapon_info(string_name, self.killed.get(username), distance_setting, for_menu)
+            weapon_info, headshot = self.get_weapon_info(
+                string_name=string_name,
+                kill_info=self.killed.get(username),
+                distance_setting=distance_setting,
+                for_menu=for_menu,
+            )
+            message_type = ''
+            if not for_menu:
+                message_type = TRANSLATION_STRINGS[f'Type:{string_name}']
             yield TRANSLATION_STRINGS['Base'].get_string(
                 self.language,
                 type_color=color or '',
-                type=TRANSLATION_STRINGS[f'Type:{string_name}'] if not for_menu else '',
+                type=message_type,
                 name_color='' if for_menu else '\x04',
                 name=username,
                 damage_color='' if for_menu else '\x01',
@@ -203,17 +220,28 @@ class PlayerStats(Player):
                 hitgroup_info=hitgroups,
             )
 
-    def get_kill_message(self, kill_type, attacker_name, attacker_headshot, weapon, distance, health, distance_setting, color=None):
-        """"""
+    def get_kill_message(
+        self, kill_type, attacker_name, attacker_headshot, weapon, distance,
+        health, distance_setting, color=None
+    ):
+        """Return the message to send for the killer's information."""
         if kill_type is None:
             return None
 
         if kill_type in ('Suicide', 'Team Killed'):
-            return TRANSLATION_STRINGS[kill_type].get_string(name=attacker_name)
+            return TRANSLATION_STRINGS[kill_type].get_string(
+                name=attacker_name,
+            )
 
         for_menu = color is None
-        weapon_info, headshot = self.get_weapon_info('Killer', PlayerKill(weapon, attacker_headshot, distance), distance_setting, for_menu)
-        return TRANSLATION_STRINGS['Killer' if health else 'Killer:Dead'].get_string(
+        weapon_info, headshot = self.get_weapon_info(
+            string_name='Killer',
+            kill_info=PlayerKill(weapon, attacker_headshot, distance),
+            distance_setting=distance_setting,
+            for_menu=for_menu,
+        )
+        message_type = 'Killer' if health else 'Killer:Dead'
+        return TRANSLATION_STRINGS[message_type].get_string(
             self.language,
             type_color='' if for_menu else color,
             headshot=headshot,
@@ -243,10 +271,25 @@ class PlayerStats(Player):
             ('Wounded', wounded_only, WOUNDED_COLOR),
             ('Killed', killed_only, KILLED_COLOR),
         ):
-            for message in self.iter_messages(string_name, group, use_hitgroups, distance_setting, color):
+            for message in self.iter_messages(
+                string_name=string_name,
+                group=group,
+                use_hitgroups=use_hitgroups,
+                distance_setting=distance_setting,
+                color=color,
+            ):
                 SayText2(message=message).send(self.index)
 
-        kill_message = self.get_kill_message(kill_type, attacker_name, attacker_headshot, weapon, distance, health, distance_setting, KILLER_COLOR)
+        kill_message = self.get_kill_message(
+            kill_type=kill_type,
+            attacker_name=attacker_name,
+            attacker_headshot=attacker_headshot,
+            weapon=weapon,
+            distance=distance,
+            health=health,
+            distance_setting=distance_setting,
+            color=KILLER_COLOR,
+        )
         if kill_message is not None:
             SayText2(message=kill_message).send(self.index)
 
@@ -277,13 +320,38 @@ class PlayerStats(Player):
             if not group:
                 continue
 
-            menu.append(SimpleOption(num, TRANSLATION_STRINGS[f'Type:{string_name}'], selectable=False))
-            for message in self.iter_messages(string_name, group, use_hitgroups, distance_setting):
+            menu.append(
+                SimpleOption(
+                    choice_index=num,
+                    text=TRANSLATION_STRINGS[f'Type:{string_name}'],
+                    selectable=False,
+                )
+            )
+            for message in self.iter_messages(
+                string_name=string_name,
+                group=group,
+                use_hitgroups=use_hitgroups,
+                distance_setting=distance_setting,
+            ):
                 menu.append('  ' + message)
 
-        kill_message = self.get_kill_message(kill_type, attacker_name, attacker_headshot, weapon, distance, health, distance_setting)
+        kill_message = self.get_kill_message(
+            kill_type=kill_type,
+            attacker_name=attacker_name,
+            attacker_headshot=attacker_headshot,
+            weapon=weapon,
+            distance=distance,
+            health=health,
+            distance_setting=distance_setting,
+        )
         if kill_message:
-            menu.append(SimpleOption(4, TRANSLATION_STRINGS['Type:Killer'], selectable=False))
+            menu.append(
+                SimpleOption(
+                    choice_index=4,
+                    text=TRANSLATION_STRINGS['Type:Killer'],
+                    selectable=False,
+                )
+            )
             menu.append('   ' + kill_message)
 
         menu.send(self.index)
@@ -300,28 +368,28 @@ class PlayerStats(Player):
         """Return the formatted distance between players."""
         feet = distance * 0.0375
         if setting == 1:
-            return '{feet:.2f}ft'.format(feet=feet)
+            return f'{feet:.2f}ft'
         meters = feet * 0.3408
         if setting == 0:
-            return '{meters:.2f}m'.format(meters=meters)
-        return '{meters:.2f}m ({feet:.2f}ft)'.format(meters=meters, feet=feet)
+            return f'{meters:.2f}m'
+        return f'{meters:.2f}m ({feet:.2f}ft)'
 
 
 class PlayerDamage(object):
-    """"""
+    """Class used to store basic damage information."""
 
     def __init__(self):
-        """"""
+        """Store the base damage information."""
         self.damage = 0
         self.hits = 0
         self.hitgroups = defaultdict(int)
 
 
 class PlayerKill(object):
-    """"""
+    """Class used to store basic kill information."""
 
     def __init__(self, weapon=None, headshot=False, distance=0):
-        """"""
+        """Store the base kill information."""
         self.kills = 0
         self.weapon = weapon
         self.headshot = headshot

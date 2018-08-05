@@ -54,10 +54,7 @@ with ConfigManager(filepath=info.name, cvar_prefix='vs') as config:
     # Add all options for the default display type
     for _item in display_type_options:
         display_type.Options.append(
-            '{value} - {text}'.format(
-                value=_item,
-                text=CONFIG_STRINGS[_item].get_string()
-            )
+            f'{_item} - {CONFIG_STRINGS[_item].get_string()}'
         )
 
     # Create the default distance type convar
@@ -70,8 +67,5 @@ with ConfigManager(filepath=info.name, cvar_prefix='vs') as config:
     # Add all options for the default display type
     for _item in distance_type_options:
         distance_type.Options.append(
-            '{value} - {text}'.format(
-                value=_item,
-                text=CONFIG_STRINGS[_item].get_string()
-            )
+            f'{_item} - {CONFIG_STRINGS[_item].get_string()}'
         )
