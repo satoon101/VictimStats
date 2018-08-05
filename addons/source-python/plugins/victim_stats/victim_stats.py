@@ -20,34 +20,32 @@ from .players import PlayerStats, player_dictionary
 def _player_hurt(game_event):
     """Add the stats for the given attack."""
     # Get the attacker
-    attacker = _get_valid_attacker(game_event)
+    attacker, victim = _get_attacker_and_victim(game_event)
 
     # Should the victim stats be collected?
     if not isinstance(attacker, PlayerStats):
         return
 
-    victim = player_dictionary[game_event['userid']]
     damage = game_event['dmg_health']
     hitgroup = game_event['hitgroup']
 
     # Add the damage stats to the attacker's dictionary for the victim
     given = attacker.given[victim.name]
-    given['damage'] += damage
-    given['hits'] += 1
-    given['hitgroups'][hitgroup] += 1
+    given.damage += damage
+    given.hits += 1
+    given.hitgroups[hitgroup] += 1
 
     # Add the damage stats to the victim's dictionary for the attacker
     taken = victim.taken[attacker.name]
-    taken['damage'] += damage
-    taken['hits'] += 1
-    taken['hitgroups'][hitgroup] += 1
+    taken.damage += damage
+    taken.hits += 1
+    taken.hitgroups[hitgroup] += 1
 
 
 @Event('player_death')
 def _player_death(game_event):
     """Send victim their stats and add the victim to the attacker's kills."""
-    attacker = _get_valid_attacker(game_event)
-    victim = player_dictionary[game_event['userid']]
+    attacker, victim = _get_attacker_and_victim(game_event)
 
     # Was this a good kill (non-team/non-suicide)?
     if isinstance(attacker, PlayerStats):
@@ -58,10 +56,10 @@ def _player_death(game_event):
 
         # Add the kill stats to the attacker's dictionary for the victim
         kills = attacker.killed[victim.name]
-        kills['kills'] += 1
-        kills['headshot'] = headshot
-        kills['weapon'] = weapon
-        kills['distance'] = distance
+        kills.kills += 1
+        kills.headshot = headshot
+        kills.weapon = weapon
+        kills.distance = distance
 
         # Send the victim their victim stats
         victim.send_stats(
@@ -75,11 +73,16 @@ def _player_death(game_event):
 
     # Was this a suicide?
     elif attacker is None:
-        victim.send_stats('Suicide')
+        victim.send_stats(
+            kill_type='Suicide',
+        )
 
     # Was this a team-kill?
     else:
-        victim.send_stats('Team-Killed', attacker.name)
+        victim.send_stats(
+            kill_type='Team-Killed',
+            attacker_name=attacker,
+        )
 
 
 @Event('player_spawn')
@@ -112,21 +115,21 @@ def _round_end(game_event):
 # =============================================================================
 # >> HELPER FUNCTIONS
 # =============================================================================
-def _get_valid_attacker(game_event):
+def _get_attacker_and_victim(game_event):
     """Return the attacker's userid if not a self or team inflicted event."""
     attacker = game_event['attacker']
     victim = game_event['userid']
 
     # Was this self inflicted?
     if attacker in (victim, 0):
-        return None
+        return None, None
 
     victim = player_dictionary[victim]
     attacker = player_dictionary[attacker]
 
     # Are the player's on the same team?
     if victim.team == attacker.team:
-        return attacker.index
+        return attacker.name, victim
 
     # If all checks pass, count the attack/kill
-    return attacker
+    return attacker, victim
