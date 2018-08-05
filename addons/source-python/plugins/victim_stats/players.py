@@ -7,24 +7,21 @@
 # =============================================================================
 # Python
 from collections import defaultdict
-from functools import partial
-from warnings import warn
 
 # Source.Python
-import colors
-from filters.players import PlayerIter
+from menus import SimpleMenu, SimpleOption
 from messages import SayText2
 from players.entity import Player
 from players.helpers import index_from_userid
 from settings.player import PlayerSettings
 
 # Plugin
-from . import hitgroup_strings, victim_stats_strings
+from .colors import ATTACKER_COLOR, KILLED_COLOR, KILLER_COLOR, WOUNDED_COLOR
 from .config import (
-    attacker_color, display_type, display_type_options, distance_type,
-    distance_type_options, killed_color, killer_color, wounded_color,
+    display_type, display_type_options, distance_type, distance_type_options,
 )
 from .info import info
+from .strings import CONFIG_STRINGS, TRANSLATION_STRINGS
 
 
 # =============================================================================
@@ -34,21 +31,7 @@ from .info import info
 user_settings = PlayerSettings(
     name=info.name,
     prefix='vs',
-    text=victim_stats_strings['Title'],
-)
-
-damage_stats = partial(
-    dict,
-    hits=0,
-    damage=0,
-    hitgroups=defaultdict(int),
-)
-kill_stats = partial(
-    dict,
-    kills=0,
-    weapon=None,
-    headshot=False,
-    distance=None,
+    text=CONFIG_STRINGS['Title'],
 )
 
 
@@ -67,27 +50,27 @@ class _PlayerDictionary(dict):
         self.display_type_setting = user_settings.add_string_setting(
             name='Display Type',
             default=str(display_type.get_int()),
-            text=victim_stats_strings['Menu:default_display_type'],
+            text=CONFIG_STRINGS['Menu:default_display_type'],
         )
 
         # Loop through and add all available options
         for item in display_type_options:
             self.display_type_setting.add_option(
                 name=item.split(':')[1],
-                text=victim_stats_strings[item],
+                text=CONFIG_STRINGS[item],
             )
 
         self.distance_type_setting = user_settings.add_string_setting(
             name='Distance Type',
             default=str(distance_type.get_int()),
-            text=victim_stats_strings['Menu:default_distance_type']
+            text=CONFIG_STRINGS['Menu:default_distance_type']
         )
 
         # Loop through and add all available options
         for item in distance_type_options:
             self.distance_type_setting.add_option(
                 name=item.split(':')[1],
-                text=victim_stats_strings[item],
+                text=CONFIG_STRINGS[item],
             )
 
     def __missing__(self, userid):
@@ -110,13 +93,13 @@ class PlayerStats(Player):
     def __init__(self, index):
         """Create the base dictionaries to store victim stats information."""
         super().__init__(index)
-        self.taken = defaultdict(damage_stats)
-        self.given = defaultdict(damage_stats)
-        self.killed = defaultdict(kill_stats)
+        self.taken = defaultdict(PlayerDamage)
+        self.given = defaultdict(PlayerDamage)
+        self.killed = defaultdict(PlayerKill)
 
     def send_stats(
-        self, kill_type=None, attacker_name=None,
-        headshot=None, weapon=None, distance=None, health=None
+        self, kill_type=None, attacker_name=None, headshot=None, weapon=None,
+        distance=None, health=None
     ):
         """Send victim stats to the player."""
         # Is the player a bot?
@@ -139,7 +122,7 @@ class PlayerStats(Player):
             self.send_chat_stats(
                 kill_type=kill_type,
                 attacker_name=attacker_name,
-                headshot=headshot,
+                attacker_headshot=headshot,
                 weapon=weapon,
                 distance=distance,
                 health=health,
@@ -152,7 +135,7 @@ class PlayerStats(Player):
             self.send_menu_stats(
                 kill_type=kill_type,
                 attacker_name=attacker_name,
-                headshot=headshot,
+                attacker_headshot=headshot,
                 weapon=weapon,
                 distance=distance,
                 health=health,
@@ -165,7 +148,7 @@ class PlayerStats(Player):
             self.send_interactive_menu(
                 kill_type=kill_type,
                 attacker_name=attacker_name,
-                headshot=headshot,
+                attacker_headshot=headshot,
                 weapon=weapon,
                 distance=distance,
                 health=health,
@@ -175,180 +158,171 @@ class PlayerStats(Player):
     def get_hitgroups(self, group):
         """Return a string for the given group's hitgroups."""
         hitgroups = list()
-        for hitgroup in group['hitgroups']:
-            current = str(hitgroup)
+        for hitgroup, value in group.hitgroups.items():
             hitgroups.append(
                 '{name}: {value}'.format(
-                    name=hitgroup_strings[current].get_string(self.language),
-                    value=group['hitgroups'][hitgroup],
+                    name=TRANSLATION_STRINGS[f'Hitgroup:{hitgroup}'].get_string(self.language),
+                    value=value,
                 )
             )
-        return '; '.join(hitgroups)
+        return ' - ' + '; '.join(hitgroups)
 
-    @staticmethod
-    def get_distance_display(distance, setting):
-        """Return the formatted distance between players."""
-        feet = distance * 0.0375
-        if setting == 0:
-            return '{feet:.2f}ft'.format(feet=feet)
-        meters = feet * 0.3408
-        if setting == 1:
-            return '{meters:.2f}m'.format(meters=meters)
-        return '{meters:.2f}m ({feet:.2f}ft)'.format(meters=meters, feet=feet)
+    def get_weapon_info(self, string_name, kill_info, distance_setting, for_menu=False):
+        """"""
+        if string_name not in ('Killed', 'Killer'):
+            return '', ''
+
+        if kill_info is None:
+            return '', ''
+
+        return TRANSLATION_STRINGS['Base:Weapon'].get_string(
+            language=self.language,
+            weapon_color='' if for_menu else '\x05',
+            weapon=kill_info.weapon,
+            at_color='' if for_menu else '\x01',
+            distance_color='' if for_menu else '\x04',
+            distance=self.get_distance_display(kill_info.distance, distance_setting),
+        ), TRANSLATION_STRINGS['Headshot'] if kill_info.headshot and not for_menu else ''
+
+    def iter_messages(self, string_name, group, use_hitgroups, distance_setting, color=None):
+        """"""
+        for_menu = color is None
+        for username, values in group.items():
+            hitgroups = self.get_hitgroups(values) if use_hitgroups else ''
+            weapon_info, headshot = self.get_weapon_info(string_name, self.killed.get(username), distance_setting, for_menu)
+            yield TRANSLATION_STRINGS['Base'].get_string(
+                self.language,
+                type_color=color or '',
+                type=TRANSLATION_STRINGS[f'Type:{string_name}'] if not for_menu else '',
+                name_color='' if for_menu else '\x04',
+                name=username,
+                damage_color='' if for_menu else '\x01',
+                damage=group[username].damage,
+                weapon_info=weapon_info,
+                headshot=headshot,
+                hitgroup_info=hitgroups,
+            )
+
+    def get_kill_message(self, kill_type, attacker_name, attacker_headshot, weapon, distance, health, distance_setting, color=None):
+        """"""
+        if kill_type is None:
+            return None
+
+        if kill_type in ('Suicide', 'Team Killed'):
+            return TRANSLATION_STRINGS[kill_type].get_string(name=attacker_name)
+
+        for_menu = color is None
+        weapon_info, headshot = self.get_weapon_info('Killer', PlayerKill(weapon, attacker_headshot, distance), distance_setting, for_menu)
+        return TRANSLATION_STRINGS['Killer' if health else 'Killer:Dead'].get_string(
+            self.language,
+            type_color='' if for_menu else color,
+            headshot=headshot,
+            name_color='' if for_menu else '\x04',
+            name=attacker_name,
+            weapon_info=weapon_info,
+            health=health,
+        )
 
     def send_chat_stats(
-        self, kill_type, attacker_name, headshot, weapon, distance, health,
-        distance_setting, use_hitgroups
+        self, kill_type, attacker_name, attacker_headshot, weapon, distance,
+        health, distance_setting, use_hitgroups
     ):
         """Send victim stats to the player's chat."""
-        index = self.get_opposing_index()
         wounded_only = {
             username: values
             for username, values in self.given.items()
             if username not in self.killed
         }
-        for string_name, group, cvar in (
-            ('Attacker', self.taken, attacker_color),
-            ('Wounded', wounded_only, wounded_color),
+        killed_only = {
+            username: values
+            for username, values in self.given.items()
+            if username in self.killed
+        }
+        for string_name, group, color in (
+            ('Attacker', self.taken, ATTACKER_COLOR),
+            ('Wounded', wounded_only, WOUNDED_COLOR),
+            ('Killed', killed_only, KILLED_COLOR),
         ):
-            string_name = 'Chat {name} '.format(name=string_name)
-            string_name += '{key} Hitgroups' if use_hitgroups else '{key}'
-            color = self.get_color(cvar)
-            for username in group:
-                values = group[username]
-                current_string = string_name.format(
-                    key='Single' if values['hits'] == 1 else 'Multi'
-                )
-                hitgroups = self.get_hitgroups(values) if use_hitgroups else ''
-                SayText2(
-                    message=victim_stats_strings[current_string],
-                    index=index,
-                ).send(
-                    self.index,
-                    color=color,
-                    name=username,
-                    damage=group[username]['damage'],
-                    hits=group[username]['hits'],
-                    hitgroups=hitgroups,
-                )
+            for message in self.iter_messages(string_name, group, use_hitgroups, distance_setting, color):
+                SayText2(message=message).send(self.index)
 
-        color = self.get_color(killed_color)
-        string_name = 'Chat Killed {key}'
-        string_name += ' Hitgroups' if use_hitgroups else ''
-        for username in self.killed:
-            if username not in self.given:
-                continue
-            kills = self.killed[username]
-            given = self.given[username]
-            if kills['kills'] > 1:
-                SayText2(
-                    message=victim_stats_strings['Chat Multi Kills'],
-                    index=index,
-                ).send(
-                    self.index,
-                    color=color,
-                    name=username,
-                    damage=given['damage'],
-                    kills=kills['kills'],
-                )
-            else:
-                current_string = string_name.format(
-                    key='Single' if given['hits'] == 1 else 'Multi'
-                )
-                kill_headshot = ' HS' if kills['headshot'] else ''
-                hitgroups = self.get_hitgroups(given) if use_hitgroups else ''
-                kill_distance = self.get_distance_display(
-                    distance=kills['distance'],
-                    setting=distance_setting,
-                )
-                SayText2(
-                    message=victim_stats_strings[current_string],
-                    index=index,
-                ).send(
-                    self.index,
-                    color=color,
-                    headshot=kill_headshot,
-                    name=username,
-                    damage=given['damage'],
-                    hits=given['hits'],
-                    weapon=kills['weapon'],
-                    distance=kill_distance,
-                    hitgroups=hitgroups,
-                )
-
-        if kill_type is None:
-            return
-
-        if kill_type in ('Suicide', 'Team Killed'):
-            SayText2(
-                message=victim_stats_strings[kill_type]
-            ).send(
-                self.index,
-                name=attacker_name,
-            )
-            return
-
-        color = self.get_color(killer_color)
-        headshot = ' HS' if headshot else ''
-        distance = self.get_distance_display(
-            distance=distance,
-            setting=distance_setting,
-        )
-        SayText2(
-            message=(
-                victim_stats_strings[
-                    'Chat {kill_type}'.format(
-                        kill_type=kill_type
-                    )
-                ]
-            ),
-            index=index,
-        ).send(
-            self.index,
-            color=color,
-            headshot=headshot,
-            name=attacker_name,
-            weapon=weapon,
-            distance=distance,
-            health=health,
-        )
-
-    def get_opposing_index(self):
-        """Return an index from the opposing team."""
-        for player in PlayerIter():
-            if player.team == 5 - self.team:
-                return player.index
-        return 0
-
-    @staticmethod
-    def get_color(cvar):
-        """Return the color for the given cvar."""
-        if cvar is None:
-            return None
-        value = cvar.get_string()
-        if value in colors.__all__:
-            return getattr(colors, value)
-        try:
-            red, green, blue = map(int, value.split(','))
-            return colors.Color(red, green, blue)
-        except ValueError:
-            warn(
-                'Cvar "{cvar}" not set to a proper value.'.format(
-                    cvar=cvar.get_name() + '  Returning RED instead.',
-                )
-            )
-            return colors.RED
+        kill_message = self.get_kill_message(kill_type, attacker_name, attacker_headshot, weapon, distance, health, distance_setting, KILLER_COLOR)
+        if kill_message is not None:
+            SayText2(message=kill_message).send(self.index)
 
     def send_menu_stats(
-        self, kill_type, attacker_name, headshot, weapon, distance, health,
-        distance_setting, use_hitgroups
+        self, kill_type, attacker_name, attacker_headshot, weapon, distance,
+        health, distance_setting, use_hitgroups
     ):
         """Send victim stats to the player via a menu."""
-        pass
+        wounded_only = {
+            username: values
+            for username, values in self.given.items()
+            if username not in self.killed
+        }
+        killed_only = {
+            username: values
+            for username, values in self.given.items()
+            if username in self.killed
+        }
+        menu = SimpleMenu()
+        for num, (string_name, group) in enumerate(
+            iterable=[
+                ('Attackers', self.taken),
+                ('Wounded', wounded_only),
+                ('Killed', killed_only),
+            ],
+            start=1
+        ):
+            if not group:
+                continue
+
+            menu.append(SimpleOption(num, TRANSLATION_STRINGS[f'Type:{string_name}'], selectable=False))
+            for message in self.iter_messages(string_name, group, use_hitgroups, distance_setting):
+                menu.append('  ' + message)
+
+        kill_message = self.get_kill_message(kill_type, attacker_name, attacker_headshot, weapon, distance, health, distance_setting)
+        if kill_message:
+            menu.append(SimpleOption(4, TRANSLATION_STRINGS['Type:Killer'], selectable=False))
+            menu.append('   ' + kill_message)
+
+        menu.send(self.index)
 
     def send_interactive_menu(
-        self, kill_type, attacker_name, headshot, weapon, distance, health,
-        distance_setting
+        self, kill_type, attacker_name, attacker_headshot, weapon, distance,
+        health, distance_setting
     ):
         """Send victim stats to the player via an interactive menu."""
         pass
+
+    @staticmethod
+    def get_distance_display(distance, setting):
+        """Return the formatted distance between players."""
+        feet = distance * 0.0375
+        if setting == 1:
+            return '{feet:.2f}ft'.format(feet=feet)
+        meters = feet * 0.3408
+        if setting == 0:
+            return '{meters:.2f}m'.format(meters=meters)
+        return '{meters:.2f}m ({feet:.2f}ft)'.format(meters=meters, feet=feet)
+
+
+class PlayerDamage(object):
+    """"""
+
+    def __init__(self):
+        """"""
+        self.damage = 0
+        self.hits = 0
+        self.hitgroups = defaultdict(int)
+
+
+class PlayerKill(object):
+    """"""
+
+    def __init__(self, weapon=None, headshot=False, distance=0):
+        """"""
+        self.kills = 0
+        self.weapon = weapon
+        self.headshot = headshot
+        self.distance = distance
