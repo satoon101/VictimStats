@@ -25,10 +25,11 @@ __all__ = (
 # >> GLOBAL VARIABLES
 # =============================================================================
 if GAME_NAME == 'csgo':
-    ATTACKER_COLOR = ''
-    WOUNDED_COLOR = ''
-    KILLED_COLOR = ''
-    KILLER_COLOR = ''
+    # ATTACKER_COLOR = '\x07'
+    ATTACKER_COLOR = '\x0F'
+    WOUNDED_COLOR = '\x0C'
+    KILLED_COLOR = '\x0A'
+    KILLER_COLOR = '\x02'
 else:
     ATTACKER_COLOR = DARK_RED
     WOUNDED_COLOR = DARK_BLUE

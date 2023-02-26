@@ -44,7 +44,7 @@ class _PlayerDictionary(dict):
     def __init__(self):
         """Create the user setting and store its options."""
         # Call the super class' init
-        super(_PlayerDictionary, self).__init__()
+        super().__init__()
 
         # Create the setting
         self.display_type_setting = user_settings.add_string_setting(
@@ -81,9 +81,9 @@ class _PlayerDictionary(dict):
     def __delitem__(self, userid):
         """Remove the player only if they are in the dictionary."""
         if userid in self:
-            super(_PlayerDictionary, self).__delitem__(userid)
+            super().__delitem__(userid)
 
-# Get the _PlayerDictionary instance
+
 player_dictionary = _PlayerDictionary()
 
 
@@ -157,7 +157,7 @@ class PlayerStats(Player):
 
     def get_hitgroups(self, group):
         """Return a string for the given group's hitgroups."""
-        hitgroups = list()
+        hitgroups = []
         for hitgroup, value in group.hitgroups.items():
             name = TRANSLATION_STRINGS[f'Hitgroup:{hitgroup}'].get_string(
                 language=self.language,
@@ -361,7 +361,6 @@ class PlayerStats(Player):
         health, distance_setting
     ):
         """Send victim stats to the player via an interactive menu."""
-        pass
 
     @staticmethod
     def get_distance_display(distance, setting):
@@ -375,7 +374,7 @@ class PlayerStats(Player):
         return f'{meters:.2f}m ({feet:.2f}ft)'
 
 
-class PlayerDamage(object):
+class PlayerDamage:
     """Class used to store basic damage information."""
 
     def __init__(self):
@@ -385,7 +384,7 @@ class PlayerDamage(object):
         self.hitgroups = defaultdict(int)
 
 
-class PlayerKill(object):
+class PlayerKill:
     """Class used to store basic kill information."""
 
     def __init__(self, weapon=None, headshot=False, distance=0):
