@@ -51,7 +51,7 @@ class _PlayerDictionary(dict):
         # Create the setting
         self.display_type_setting = user_settings.add_string_setting(
             name="Display Type",
-            default=str(display_type.get_int()),
+            default=str(int(display_type)),
             text=CONFIG_STRINGS["Menu:default_display_type"],
         )
 
@@ -64,7 +64,7 @@ class _PlayerDictionary(dict):
 
         self.distance_type_setting = user_settings.add_string_setting(
             name="Distance Type",
-            default=str(distance_type.get_int()),
+            default=str(int(distance_type)),
             text=CONFIG_STRINGS["Menu:default_distance_type"],
         )
 
