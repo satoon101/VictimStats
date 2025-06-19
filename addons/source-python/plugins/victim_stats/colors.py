@@ -1,6 +1,6 @@
 # ../victim_stats/colors.py
 
-"""Contains all translation variables for the base plugin."""
+"""Contains all translation variables for the plugin."""
 
 # =============================================================================
 # >> IMPORTS

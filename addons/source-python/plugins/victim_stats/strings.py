@@ -1,6 +1,6 @@
 # ../victim_stats/strings.py
 
-"""Contains all translation variables for the base plugin."""
+"""Contains all translation variables for the plugin."""
 
 # =============================================================================
 # >> IMPORTS
